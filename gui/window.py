@@ -1,6 +1,8 @@
 import tkinter as tk
 import tkinter.ttk as ttk
 
+from data.variable import Variable
+
 
 class Window:
     def __init__(self):
@@ -28,7 +30,7 @@ class Window:
 
         self._rulesEditor = tk.Text(rulesFrame)
         self._rulesEditor.pack(side=tk.TOP, fill=tk.BOTH,
-                         expand=True, padx=5, pady=5)
+                               expand=True, padx=5, pady=5)
 
         variablesFrame = ttk.LabelFrame(self._window, text="Variables")
         variablesFrame.grid(row=0, column=1, sticky=tk.NSEW, padx=5, pady=5)
@@ -45,12 +47,12 @@ class Window:
 
         self._variablesList = tk.Listbox(variablesFrame)
         self._variablesList.pack(side=tk.TOP, fill=tk.BOTH,
-                           expand=True, padx=5, pady=5)
+                                 expand=True, padx=5, pady=5)
 
         selectedVariableFrame = ttk.LabelFrame(
             variablesFrame, text="Selected variable")
         selectedVariableFrame.pack(side=tk.TOP, fill=tk.BOTH,
-                                      expand=True, padx=5, pady=5)
+                                   expand=True, padx=5, pady=5)
 
         actionsFrame = ttk.LabelFrame(self._window, text="Simulation")
         actionsFrame.grid(row=0, column=2, sticky=tk.NSEW, padx=5, pady=5)
@@ -58,13 +60,12 @@ class Window:
         runButton = ttk.Button(actionsFrame, text="Run simulation")
         runButton.pack(side=tk.TOP, fill=tk.X, padx=5, pady=5)
 
-
     def populateWindow(self):
         for i in range(10):
             self._variablesList.insert(tk.END, f"Variable {i}")
 
-    def getVariables(self):
+    def getVariables(self) -> tuple[Variable]:
         return tuple(self._variables)
 
-    def getRules(self):
+    def getRules(self) -> str:
         return self._rulesEditor.get("1.0", tk.END)
