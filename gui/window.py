@@ -15,7 +15,11 @@ class Window:
     def __init__(self):
         self._window = tk.Tk()
         self._window.state('zoomed')
-        self._window.minsize(950, 900)
+        self._window.minsize(1050, 900)
+
+        self._variables = []
+        self._crispInputs = []
+        self._crispOutputs = []
 
         self.initializeWindow()
         self.newFile()
@@ -25,7 +29,7 @@ class Window:
     def initializeWindow(self):
         self._window.columnconfigure(0, weight=3, minsize=400)
         self._window.columnconfigure(1, weight=2, minsize=400)
-        self._window.columnconfigure(2, weight=1, minsize=150)
+        self._window.columnconfigure(2, weight=1, minsize=200)
 
         self._window.rowconfigure(0, weight=1)
 
@@ -63,8 +67,12 @@ class Window:
 
         self._rulesEditor.delete("1.0", tk.END)
 
+        self._projectTitleEntry.delete(0, tk.END)
+        self._projectDescriptionText.delete("1.0", tk.END)
+
         self.selectVariable(None)
         self.selectFuzzySet(None, -1)
+        self.updateVariableFrame()
 
     def openFile(self):
         filename = filedialog.askopenfilename(
@@ -76,9 +84,16 @@ class Window:
             with open(filename, "r") as file:
                 data = json.load(file)
 
+                self._projectTitleEntry.delete(0, tk.END)
+                self._projectTitleEntry.insert(0, data["title"])
+
+                self._projectDescriptionText.delete("1.0", tk.END)
+                self._projectDescriptionText.insert("1.0", data["description"])
+
                 self._variables = []
                 for variableData in data["variables"]:
-                    variable = Variable(name=variableData["name"], limits=tuple(variableData["limits"]), type=variableData["type"])
+                    variable = Variable(name=variableData["name"], limits=tuple(
+                        variableData["limits"]), type=variableData["type"])
                     for fuzzySetData in variableData["fuzzySets"]:
                         variable.addFuzzySet(
                             FuzzySet(
@@ -120,6 +135,8 @@ class Window:
 
     def saveToFile(self, filename):
         data = {
+            "title": self._projectTitleEntry.get(),
+            "description": self._projectDescriptionText.get("1.0", tk.END),
             "variables": [
                 {
                     "name": variable.name,
@@ -148,8 +165,58 @@ class Window:
         self._window.title(f"Fuzzy logic toolbox - {self.filename}")
 
     def initializeSimulationFrame(self):
-        actionsFrame = ttk.LabelFrame(self._window, text="Simulation")
-        actionsFrame.grid(row=0, column=2, sticky=tk.NSEW, padx=5, pady=5)
+        simulationFrame = ttk.Frame(self._window)
+        simulationFrame.grid(row=0, column=2, sticky=tk.NSEW, padx=5, pady=5)
+
+        projectDetailsFrame = ttk.LabelFrame(
+            simulationFrame, text="Project details")
+        projectDetailsFrame.pack(side=tk.TOP, fill=tk.X, padx=5, pady=5)
+
+        projectTitleLabelFrame = ttk.LabelFrame(
+            projectDetailsFrame, text="Project title")
+        projectTitleLabelFrame.pack(side=tk.TOP, fill=tk.X, padx=5, pady=5)
+
+        self._projectTitleEntry = ttk.Entry(projectTitleLabelFrame)
+        self._projectTitleEntry.pack(side=tk.TOP, fill=tk.X, padx=5, pady=5)
+
+        projectDescriptionLabelFrame = ttk.LabelFrame(
+            projectDetailsFrame, text="Project description")
+        projectDescriptionLabelFrame.pack(side=tk.TOP, fill=tk.X,
+                                          padx=5, pady=5)
+
+        self._projectDescriptionText = tk.Text(
+            projectDescriptionLabelFrame, wrap=tk.WORD)
+        self._projectDescriptionText.config(height=5, width=30)
+        self._projectDescriptionText.pack(side=tk.TOP, fill=tk.X,
+                                          padx=5, pady=5)
+
+        actionsFrame = ttk.LabelFrame(simulationFrame, text="Simulation")
+        actionsFrame.pack(side=tk.TOP, fill=tk.BOTH,
+                          expand=True, padx=5, pady=5)
+
+        # Scrollable frame of variables
+        variablesFrame = ttk.Frame(actionsFrame)
+        variablesFrame.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+
+        self._variablesCanvas = tk.Canvas(variablesFrame)
+        self._variablesCanvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        variablesFrameScrollbar = ttk.Scrollbar(
+            variablesFrame, orient=tk.VERTICAL)
+        variablesFrameScrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        variablesFrameScrollbar.config(command=self._variablesCanvas.yview)
+        self._variablesCanvas.config(
+            yscrollcommand=variablesFrameScrollbar.set)
+
+        variablesFrame.bind("<Configure>", lambda e: self._variablesCanvas.configure(
+            scrollregion=self._variablesCanvas.bbox("all")))
+
+        self._variablesFrame = ttk.Frame(self._variablesCanvas)
+        self._variablesCanvas.create_window((0, 0), window=self._variablesFrame,
+                                            anchor=tk.NW)
+
+        self.updateVariableFrame()
 
         runButton = ttk.Button(actionsFrame, text="Run simulation")
         runButton.pack(side=tk.TOP, fill=tk.X, padx=5, pady=5)
@@ -327,7 +394,7 @@ class Window:
         rulesFrame = ttk.LabelFrame(self._window, text="Rules")
         rulesFrame.grid(row=0, column=0, sticky=tk.NSEW, padx=5, pady=5)
 
-        self._rulesEditor = tk.Text(rulesFrame)
+        self._rulesEditor = tk.Text(rulesFrame, wrap=tk.WORD)
         self._rulesEditor.pack(side=tk.TOP, fill=tk.BOTH,
                                expand=True, padx=5, pady=5)
 
@@ -350,13 +417,14 @@ class Window:
     def getRules(self) -> str:
         return self._rulesEditor.get("1.0", tk.END)
 
-    def addNewVariable(self, event, variable = None):
+    def addNewVariable(self, event, variable=None):
         if variable is None:
             variable = Variable(
                 name=f"Variable {len(self._variables)}", type=IN, limits=(0, 100),)
             self._variables.append(variable)
         self._variablesList.insert(
             tk.END, f"{variable.name} - {variable.type} - {variable.limits}")
+        self.updateVariableFrame()
 
     def removeSelectedVariable(self, event):
         selection = self._variablesList.curselection()
@@ -366,6 +434,7 @@ class Window:
             self._variablesList.delete(index)
             self._variablesList.selection_clear(0, tk.END)
             self.selectVariable(None)
+        self.updateVariableFrame()
 
     def selectVariable(self, event):
         selection = self._variablesList.curselection()
@@ -445,6 +514,7 @@ class Window:
             index, f"{self._variables[index].name} - {self._variables[index].type} - {self._variables[index].limits}")
         self._variablesList.selection_set(index)
         self._visualizer.draw()
+        self.updateVariableFrame()
 
     def addNewFuzzySet(self, event, index):
         fuzzySet = FuzzySet(name=f"Set {len(self._variables[index].fuzzySets)}",
@@ -544,3 +614,40 @@ class Window:
             self._selectedVariableFuzzySetsList.selection_set(fuzzySetIndex)
 
         self._visualizer.draw()
+
+    def updateVariableFrame(self):
+        for widget in self._variablesFrame.winfo_children():
+            widget.destroy()
+        self._variablesFrame.columnconfigure(0, weight=1)
+        self._variablesFrame.columnconfigure(1, weight=1)
+
+        i = 0
+        self._crispInputs = []
+        for variable in self._variables:
+            if variable.type == OUT:
+                continue
+            variableLabel = ttk.Label(
+                self._variablesFrame, text=f"{variable.name}:")
+            variableLabel.grid(row=i, column=0, sticky=tk.W, padx=5, pady=5)
+            variableEntry = ttk.Entry(self._variablesFrame)
+            variableEntry.grid(row=i, column=1, sticky=tk.NSEW, padx=5, pady=5)
+            self._crispInputs.append(variableEntry)
+
+            i += 1
+
+        self._crispOutputs = []
+        for variable in self._variables:
+            if variable.type == IN:
+                continue
+            variableLabel = ttk.Label(
+                self._variablesFrame, text=f"{variable.name}:")
+            variableLabel.grid(row=i, column=0, sticky=tk.W, padx=5, pady=5)
+            variableEntry = ttk.Label(self._variablesFrame)
+            variableEntry.grid(row=i, column=1, sticky=tk.NSEW, padx=5, pady=5)
+            self._crispOutputs.append(variableEntry)
+
+            i += 1
+
+        self._variablesCanvas.update()
+        self._variablesCanvas.update_idletasks()
+        self._variablesCanvas.configure(scrollregion=self._variablesCanvas.bbox("all"))
