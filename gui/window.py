@@ -1,6 +1,8 @@
 import tkinter as tk
 import tkinter.ttk as ttk
+from tkinter import filedialog
 from typing import Literal
+import json
 
 from data.variable import *
 from data.fuzzy_set import *
@@ -12,14 +14,11 @@ class Window:
 
     def __init__(self):
         self._window = tk.Tk()
-        self._window.title("Fuzzy logic toolbox")
         self._window.state('zoomed')
         self._window.minsize(950, 900)
 
-        self._variables = []
-        self._selectedFuzzySetIndex = -1
-
         self.initializeWindow()
+        self.newFile()
 
         self._window.mainloop()
 
@@ -39,15 +38,114 @@ class Window:
         menu = tk.Menu(self._window)
 
         fileMenu = tk.Menu(menu, tearoff=0)
-        fileMenu.add_command(label="New")
-        fileMenu.add_command(label="Open")
-        fileMenu.add_command(label="Save")
-        fileMenu.add_command(label="Save as...")
+        fileMenu.add_command(label="New", command=self.newFile)
+        fileMenu.add_command(label="Open", command=self.openFile)
+        fileMenu.add_command(label="Save", command=self.saveFile)
+        fileMenu.add_command(label="Save as...", command=self.saveFileAs)
         fileMenu.add_separator()
         fileMenu.add_command(label="Exit", command=self._window.quit)
         menu.add_cascade(label="File", menu=fileMenu)
 
         self._window.config(menu=menu)
+
+    def newFile(self):
+        self.filename = "Untitled"
+        self._window.title(f"Fuzzy logic toolbox - {self.filename}")
+        self._variables = []
+        self._selectedFuzzySetIndex = -1
+
+        self._variablesList.delete(0, tk.END)
+        self._variablesList.selection_clear(0, tk.END)
+        self._selectedVariableFuzzySetsList.delete(0, tk.END)
+        self._selectedVariableFuzzySetsList.selection_clear(0, tk.END)
+        self._visualizer.variable = None
+        self._visualizer.draw()
+
+        self._rulesEditor.delete("1.0", tk.END)
+
+        self.selectVariable(None)
+        self.selectFuzzySet(None, -1)
+
+    def openFile(self):
+        filename = filedialog.askopenfilename(
+            title="Open file",
+            filetypes=[("JSON files", "*.json")],
+        )
+
+        if filename:
+            with open(filename, "r") as file:
+                data = json.load(file)
+
+                self._variables = []
+                for variableData in data["variables"]:
+                    variable = Variable(name=variableData["name"], limits=tuple(variableData["limits"]), type=variableData["type"])
+                    for fuzzySetData in variableData["fuzzySets"]:
+                        variable.addFuzzySet(
+                            FuzzySet(
+                                type=fuzzySetData["type"],
+                                values=fuzzySetData["values"],
+                                name=fuzzySetData["name"],
+                            )
+                        )
+                    self._variables.append(variable)
+
+                self._rulesEditor.delete("1.0", tk.END)
+                self._rulesEditor.insert("1.0", data["rules"])
+
+                self._variablesList.delete(0, tk.END)
+                for variable in self._variables:
+                    self.addNewVariable(None, variable)
+
+                self._variablesList.selection_clear(0, tk.END)
+                self.selectVariable(None)
+
+                self.filename = filename
+                self._window.title(f"Fuzzy logic toolbox - {self.filename}")
+
+    def saveFile(self):
+        if self.filename == "Untitled":
+            self.saveFileAs()
+        else:
+            self.saveToFile(self.filename)
+
+    def saveFileAs(self):
+        filename = filedialog.asksaveasfilename(
+            title="Save file",
+            filetypes=[("JSON files", "*.json")],
+            defaultextension="*.*",
+        )
+
+        if filename:
+            self.saveToFile(filename)
+
+    def saveToFile(self, filename):
+        data = {
+            "variables": [
+                {
+                    "name": variable.name,
+                    "limits": variable.limits,
+                    "type": variable.type,
+                    "fuzzySets": [
+                        {
+                            "name": fuzzySet.name,
+                            "type": fuzzySet.type,
+                            "values": fuzzySet.values,
+                        }
+                        for fuzzySet in variable.fuzzySets
+                    ],
+                }
+                for variable in self._variables
+            ],
+            "rules": self._rulesEditor.get("1.0", tk.END),
+        }
+        if not filename.endswith(".json"):
+            filename += ".json"
+
+        with open(filename, "w") as file:
+            json.dump(data, file)
+
+        self.filename = filename
+        self._window.title(f"Fuzzy logic toolbox - {self.filename}")
 
     def initializeSimulationFrame(self):
         actionsFrame = ttk.LabelFrame(self._window, text="Simulation")
@@ -252,10 +350,11 @@ class Window:
     def getRules(self) -> str:
         return self._rulesEditor.get("1.0", tk.END)
 
-    def addNewVariable(self, event):
-        variable = Variable(
-            name=f"Variable {len(self._variables)}", type=IN, limits=(0, 100),)
-        self._variables.append(variable)
+    def addNewVariable(self, event, variable = None):
+        if variable is None:
+            variable = Variable(
+                name=f"Variable {len(self._variables)}", type=IN, limits=(0, 100),)
+            self._variables.append(variable)
         self._variablesList.insert(
             tk.END, f"{variable.name} - {variable.type} - {variable.limits}")
 
