@@ -20,7 +20,7 @@ class Window:
     def __init__(self):
         self._window = tk.Tk()
         self._window.state('zoomed')
-        self._window.minsize(1050, 900)
+        self._window.minsize(1050, 700)
 
         self._variables = []
         self._crispInputs = []
@@ -206,41 +206,8 @@ class Window:
         self._projectDescriptionText.pack(side=tk.TOP, fill=tk.X,
                                           padx=5, pady=5)
 
-        actionsFrame = ttk.LabelFrame(simulationFrame, text="Simulation")
-        actionsFrame.pack(side=tk.TOP, fill=tk.BOTH,
-                          expand=True, padx=5, pady=5)
-
-        # Scrollable frame of variables
-        variablesFrame = ttk.Frame(actionsFrame)
-        variablesFrame.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
-
-        self._variablesCanvas = tk.Canvas(variablesFrame)
-        self._variablesCanvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-
-        variablesFrameScrollbar = ttk.Scrollbar(
-            variablesFrame, orient=tk.VERTICAL)
-        variablesFrameScrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-
-        variablesFrameScrollbar.config(command=self._variablesCanvas.yview)
-        self._variablesCanvas.config(
-            yscrollcommand=variablesFrameScrollbar.set)
-
-        variablesFrame.bind("<Configure>", lambda e: self._variablesCanvas.configure(
-            scrollregion=self._variablesCanvas.bbox("all")))
-
-        self._variablesFrame = ttk.Frame(self._variablesCanvas)
-        self._variablesCanvas.create_window((0, 0), window=self._variablesFrame,
-                                            anchor=tk.NW)
-
-        self.updateVariableFrame()
-
-        runButton = ttk.Button(actionsFrame, text="Run simulation")
-        runButton.pack(side=tk.TOP, fill=tk.X, padx=5, pady=5)
-        runButton.bind("<Button-1>", self.runSimulation)
-
-    def initializeVariablesFrame(self):
-        variablesFrame = ttk.LabelFrame(self._window, text="Variables")
-        variablesFrame.grid(row=0, column=1, sticky=tk.NSEW, padx=5, pady=5)
+        variablesFrame = ttk.LabelFrame(simulationFrame, text="Variables")
+        variablesFrame.pack(side=tk.TOP, fill=tk.X, padx=5, pady=5)
 
         variableActionsFrame = ttk.Frame(variablesFrame)
         variableActionsFrame.pack(side=tk.TOP, fill=tk.X, padx=5, pady=5)
@@ -260,12 +227,45 @@ class Window:
                                  expand=True, padx=5, pady=5)
         self._variablesList.bind("<<ListboxSelect>>", self.selectVariable)
 
+        actionsFrame = ttk.LabelFrame(simulationFrame, text="Simulation")
+        actionsFrame.pack(side=tk.TOP, fill=tk.BOTH,
+                          expand=True, padx=5, pady=5)
+
+        
+        runButton = ttk.Button(actionsFrame, text="Run simulation")
+        runButton.pack(side=tk.BOTTOM, fill=tk.X, padx=5, pady=5)
+        runButton.bind("<Button-1>", self.runSimulation)
+
+        # Scrollable frame of variables
+        variablesFrame = ttk.Frame(actionsFrame)
+        variablesFrame.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+
+        variablesFrameScrollbar = ttk.Scrollbar(
+            variablesFrame, orient=tk.VERTICAL)
+        variablesFrameScrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        self._variablesCanvas = tk.Canvas(variablesFrame)
+        self._variablesCanvas.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
+
+        variablesFrameScrollbar.config(command=self._variablesCanvas.yview)
+        self._variablesCanvas.config(
+            yscrollcommand=variablesFrameScrollbar.set)
+
+        variablesFrame.bind("<Configure>", lambda e: self._variablesCanvas.configure(
+            scrollregion=self._variablesCanvas.bbox("all")))
+
+        self._variablesFrame = ttk.Frame(self._variablesCanvas)
+        self._variablesCanvas.create_window((0, 0), window=self._variablesFrame,
+                                            anchor=tk.NW)
+
+        self.updateVariableFrame()
+
+    def initializeVariablesFrame(self):
         # Selected variable frame
 
         self._selectedVariableFrame = ttk.LabelFrame(
-            variablesFrame, text="Selected variable")
-        self._selectedVariableFrame.pack(side=tk.TOP, fill=tk.BOTH,
-                                         expand=True, padx=5, pady=5)
+            self._window, text="Selected variable")
+        self._selectedVariableFrame.grid(row=0, column=1, sticky=tk.NSEW, padx=5, pady=5)
 
         selectedVariableDataFrame = ttk.Frame(self._selectedVariableFrame)
         selectedVariableDataFrame.pack(side=tk.TOP, fill=tk.X)
