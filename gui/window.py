@@ -1,4 +1,6 @@
+import re
 import tkinter as tk
+from tkinter import messagebox
 import tkinter.ttk as ttk
 from tkinter import filedialog
 from typing import Literal
@@ -6,11 +8,14 @@ import json
 
 from data.variable import *
 from data.fuzzy_set import *
+from engine.engine import simulate
 from gui.visualizer import Visualizer
 
 
 class Window:
     _variables: list[Variable]
+    _crispInputs: list[tk.Entry]
+    _crispOutputs: list[tk.Label]
 
     def __init__(self):
         self._window = tk.Tk()
@@ -66,6 +71,9 @@ class Window:
         self._visualizer.draw()
 
         self._rulesEditor.delete("1.0", tk.END)
+        self._rulesEditor.insert("1.0", "# Enter the rules in this format:\n" +
+                                        "# IN_variable set operator IN_variable set => OUT_variable set\n\n" +
+                                        "# Comments start with #\n")
 
         self._projectTitleEntry.delete(0, tk.END)
         self._projectDescriptionText.delete("1.0", tk.END)
@@ -114,6 +122,12 @@ class Window:
                 self._variablesList.selection_clear(0, tk.END)
                 self.selectVariable(None)
 
+                for i, entry in enumerate(self._crispInputs):
+                    entry.insert(0, data["inputs"][i])
+
+                for i, label in enumerate(self._crispOutputs):
+                    label.config(text=data["outputs"][i])
+
                 self.filename = filename
                 self._window.title(f"Fuzzy logic toolbox - {self.filename}")
 
@@ -154,6 +168,8 @@ class Window:
                 for variable in self._variables
             ],
             "rules": self._rulesEditor.get("1.0", tk.END),
+            "inputs": [x.get() for x in self._crispInputs],
+            "outputs": [x.cget('text') for x in self._crispOutputs],
         }
         if not filename.endswith(".json"):
             filename += ".json"
@@ -220,6 +236,7 @@ class Window:
 
         runButton = ttk.Button(actionsFrame, text="Run simulation")
         runButton.pack(side=tk.TOP, fill=tk.X, padx=5, pady=5)
+        runButton.bind("<Button-1>", self.runSimulation)
 
     def initializeVariablesFrame(self):
         variablesFrame = ttk.LabelFrame(self._window, text="Variables")
@@ -410,9 +427,6 @@ class Window:
                     child.state(["!disabled"])
             else:
                 child.configure(state=state)
-
-    def getVariables(self) -> tuple[Variable]:
-        return tuple(self._variables)
 
     def getRules(self) -> str:
         return self._rulesEditor.get("1.0", tk.END)
@@ -651,3 +665,44 @@ class Window:
         self._variablesCanvas.update()
         self._variablesCanvas.update_idletasks()
         self._variablesCanvas.configure(scrollregion=self._variablesCanvas.bbox("all"))
+
+    def runSimulation(self, event=None):
+        rules = self.getRules().strip().split("\n")
+        rules = [re.sub(r'#.*', '', x) for x in rules]
+        rules = [x.strip() for x in rules]
+        rules = [x for x in rules if x != ""]
+        if len(rules) == 0:
+            messagebox.showerror("Error", "Can't run simulation without rules")
+            return
+
+        if len(self._variables) == 0:
+            messagebox.showerror("Error", "Can't run simulation, please define variables")
+            return
+
+        for variable in self._variables:
+            if len(variable.fuzzySets) == 0:
+                messagebox.showerror("Error", "Can't run simulation, please define fuzzy sets for all variables")
+                return
+
+        crispInputs: list[str] = [x.get() for x in self._crispInputs]
+        try:
+            crispInputs = [float(x) for x in crispInputs]
+        except ValueError:
+            messagebox.showerror(
+                "Error", "All inputs must be numbers")
+            return
+
+        for i, variable in enumerate(filter(lambda x: x.type == IN, self._variables)):
+            if crispInputs[i] < variable.limits[0] or crispInputs[i] > variable.limits[1]:
+                messagebox.showerror(
+                    "Error", f"Input {variable.name} must be between {variable.limits[0]} and {variable.limits[1]}")
+                return
+
+        try:
+            outputs = simulate(self._variables, crispInputs, rules)
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+            return
+
+        for i, (output, set) in enumerate(outputs):
+            self._crispOutputs[i].config(text=f"{round(output, 2)} ({set})")
